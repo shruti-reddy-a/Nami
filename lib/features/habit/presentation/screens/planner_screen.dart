@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:calendar_view/calendar_view.dart';
@@ -7,7 +8,8 @@ import 'package:nami/features/habit/data/habit_recurrence.dart';
 import 'package:nami/features/habit/providers/habit_provider.dart';
 import 'package:nami/features/habit/presentation/screens/habit_detail_screen.dart';
 import 'package:nami/core/presentation/widgets/common_app_bar_actions.dart';
-
+import 'package:nami/core/utils/string_extensions.dart';
+import 'package:nami/features/habit/presentation/utils/habit_ui_helper.dart';
 class PlannerScreen extends ConsumerStatefulWidget {
   const PlannerScreen({super.key});
 
@@ -151,13 +153,12 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
         backgroundColor: theme.colorScheme.surface,
         elevation: 0,
         scrolledUnderElevation: 0,
-        centerTitle: true,
         title: Text(
-          "Today's Flow",
+          'NAMI',
           style: TextStyle(
-            fontSize: 24,
             fontWeight: FontWeight.w800,
-            color: theme.colorScheme.onSurface,
+            color: theme.colorScheme.primary,
+            letterSpacing: 1.2,
           ),
         ),
         actions: const [CommonAppBarActions()],
@@ -201,13 +202,21 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
         ),
       ),
       body: SafeArea(
-        child: Column(
-          children: [
-            const SizedBox(height: 16),
-            Expanded(
-              child: _buildCalendarView(theme, _eventController),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 800),
+            child: SizedBox(
+              width: double.infinity,
+              child: Column(
+                children: [
+                  const SizedBox(height: 16),
+                  Expanded(
+                  child: _buildCalendarView(theme, _eventController),
+                ),
+              ],
             ),
-          ],
+          ),
+        ),
         ),
       ),
     );
@@ -230,12 +239,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
     final primaryTeal = const Color(0xFF00696F);
     final lightTeal = const Color(0xFF90C2C6);
     
-    IconData? habitIcon;
-    if (habit.title.toLowerCase().contains('run')) {
-      habitIcon = Icons.directions_run;
-    } else if (habit.title.toLowerCase().contains('hydration') || habit.title.toLowerCase().contains('water')) {
-      habitIcon = Icons.water_drop;
-    }
+    final habitIcon = HabitUIHelper.getIconForHabit(habit.title);
     
     String? description;
     if (habit.title.toLowerCase().contains('meditation')) {
@@ -246,10 +250,24 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
       onTap: () {
         Navigator.push(context, MaterialPageRoute(builder: (_) => HabitDetailScreen(habit: habit)));
       },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
-        color: Colors.transparent, // Ensures the entire area is tappable
-        child: Row(
+      child: Material(
+        elevation: isLogged ? 0 : 2,
+        shadowColor: theme.colorScheme.shadow.withValues(alpha: 0.1),
+        color: isLogged 
+            ? theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3) 
+            : (theme.brightness == Brightness.light ? Colors.white : theme.colorScheme.surfaceContainerHigh),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+          side: BorderSide(color: isLogged ? Colors.transparent : theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+        ),
+        clipBehavior: Clip.hardEdge,
+        child: OverflowBox(
+          alignment: Alignment.topLeft,
+          minHeight: 0,
+          maxHeight: double.infinity,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Left Indicator (only for pending)
@@ -265,28 +283,35 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
               ),
             if (isLogged) const SizedBox(width: 12),
             
-            // Check Circle
-            GestureDetector(
+            InkWell(
+              borderRadius: BorderRadius.circular(12),
               onTap: () {
+                HapticFeedback.mediumImpact();
                 if (!isLogged) {
                   ref.read(habitLogProvider.notifier).logHabit(habit.id);
                 } else {
                   ref.read(habitLogProvider.notifier).removeLog(logList.first.id);
                 }
               },
-              child: Padding(
-                padding: const EdgeInsets.only(top: 0.0),
+              child: Container(
+                width: 24,
+                height: 24,
+                decoration: BoxDecoration(
+                  color: isLogged ? primaryTeal : theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
+                  shape: BoxShape.circle,
+                  border: isLogged ? null : Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.2), width: 1.5),
+                ),
                 child: Icon(
-                  isLogged ? Icons.check_circle : Icons.circle_outlined,
-                  color: isLogged ? primaryTeal : theme.colorScheme.onSurfaceVariant,
-                  size: 20,
+                  isLogged ? Icons.check : Icons.add,
+                  color: isLogged ? Colors.white : theme.colorScheme.primary,
+                  size: 16,
                 ),
               ),
             ),
             const SizedBox(width: 8),
             
             // Optional Icon next to circle
-            if (!isLogged && habitIcon != null) ...[
+            if (!isLogged) ...[
               Padding(
                 padding: const EdgeInsets.only(top: 0.0),
                 child: Icon(habitIcon, color: primaryTeal, size: 18),
@@ -301,7 +326,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    habit.title,
+                    habit.title.capitalizeAllWords(),
                     style: TextStyle(
                       color: isLogged ? primaryTeal : theme.colorScheme.onSurface, 
                       fontSize: 14,
@@ -310,10 +335,11 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  Text(
-                    durationString,
-                    style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.w500),
-                  ),
+                  if (boundary.height > 40)
+                    Text(
+                      durationString,
+                      style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.w500),
+                    ),
                   if (description != null && boundary.height > 50)
                     Padding(
                       padding: const EdgeInsets.only(top: 2.0),
@@ -329,6 +355,8 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
             ),
           ],
         ),
+      ),
+      ),
       ),
     );
       },

@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:nami/features/profile/presentation/profile_screen.dart';
+import 'package:nami/features/profile/providers/profile_provider.dart';
 
-class CommonAppBarActions extends StatelessWidget {
+class CommonAppBarActions extends ConsumerWidget {
   const CommonAppBarActions({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final profile = ref.watch(userProfileProvider).value;
+    final photoUrl = profile?.photoUrl;
+
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -24,10 +29,12 @@ class CommonAppBarActions extends StatelessWidget {
             onTap: () {
               Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileScreen()));
             },
-            child: const CircleAvatar(
+            child: CircleAvatar(
               radius: 16,
-              backgroundColor: Colors.teal,
-              child: Icon(Icons.person, color: Colors.white, size: 20),
+              backgroundColor: theme.colorScheme.primaryContainer.withValues(alpha: 0.5),
+              child: photoUrl != null
+                  ? ClipOval(child: Image.network(photoUrl, width: 32, height: 32, fit: BoxFit.cover))
+                  : Icon(Icons.person, color: theme.colorScheme.primary, size: 20),
             ),
           ),
         ),

@@ -1,79 +1,177 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:nami/core/utils/string_extensions.dart';
+import 'package:nami/features/habit/presentation/utils/habit_ui_helper.dart';
 import 'package:nami/features/habit/data/habit.dart';
 import 'package:nami/features/habit/data/habit_log.dart';
 import 'package:nami/features/habit/providers/habit_provider.dart';
 import 'package:nami/features/habit/services/consistency_calculator.dart';
-import 'package:nami/core/constants/app_strings.dart';
 import 'package:nami/features/habit/presentation/screens/add_edit_habit_screen.dart';
 import 'package:nami/features/habit/presentation/screens/habit_detail_screen.dart';
 import 'package:nami/core/presentation/widgets/common_app_bar_actions.dart';
 
-class HabitsScreen extends ConsumerWidget {
+enum HabitSortOption {
+  aToZ('A-Z'),
+  zToA('Z-A'),
+  latestAdded('Latest Added'),
+  latestUpdated('Latest Updated'),
+  chronological('Chronological');
+
+  final String label;
+  const HabitSortOption(this.label);
+}
+
+class HabitsScreen extends ConsumerStatefulWidget {
   const HabitsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final habits = ref.watch(habitProvider);
+  ConsumerState<HabitsScreen> createState() => _HabitsScreenState();
+}
+
+class _HabitsScreenState extends ConsumerState<HabitsScreen> {
+  String _searchQuery = '';
+  HabitSortOption _sortOption = HabitSortOption.aToZ;
+
+  @override
+  Widget build(BuildContext context) {
+    final allHabits = ref.watch(habitProvider);
     final logs = ref.watch(habitLogProvider);
     final theme = Theme.of(context);
+    
+    final filteredHabits = _searchQuery.isEmpty 
+        ? allHabits 
+        : allHabits.where((h) => h.title.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
+
+    final habits = List<Habit>.from(filteredHabits);
+    switch (_sortOption) {
+      case HabitSortOption.aToZ:
+        habits.sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
+        break;
+      case HabitSortOption.zToA:
+        habits.sort((a, b) => b.title.toLowerCase().compareTo(a.title.toLowerCase()));
+        break;
+      case HabitSortOption.latestAdded:
+        habits.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        break;
+      case HabitSortOption.latestUpdated:
+        habits.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+        break;
+      case HabitSortOption.chronological:
+        habits.sort((a, b) {
+          final timeA = _getHourForHabit(a);
+          final timeB = _getHourForHabit(b);
+          if (timeA == timeB) return a.title.toLowerCase().compareTo(b.title.toLowerCase());
+          if (timeA == -1) return 1;
+          if (timeB == -1) return -1;
+          return timeA.compareTo(timeB);
+        });
+        break;
+    }
 
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        title: Container(
-          height: 40,
-          decoration: BoxDecoration(
-            color: theme.colorScheme.onSurface.withValues(alpha: 0.05),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: TextField(
-            decoration: InputDecoration(
-              hintText: 'Search habits...',
-              hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant),
-              prefixIcon: Icon(Icons.search, color: theme.colorScheme.onSurfaceVariant),
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(vertical: 10),
-            ),
-          ),
-        ),
+        title: Text('NAMI', style: TextStyle(fontWeight: FontWeight.w800, color: theme.colorScheme.primary, letterSpacing: 1.2)),
         elevation: 0,
+        backgroundColor: Colors.transparent,
         actions: const [CommonAppBarActions()],
       ),
-      body: habits.isEmpty
-          ? Center(
-              child: Padding(
-                padding: const EdgeInsets.all(32.0),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 800),
+          child: SizedBox(
+            width: double.infinity,
+            child: Column(
+              children: [
+                Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                child: Row(
                   children: [
-                    Icon(Icons.style, size: 48, color: theme.colorScheme.primaryContainer),
-                    const SizedBox(height: 16),
-                    Text("No habits yet", style: theme.textTheme.headlineSmall),
-                    const SizedBox(height: 8),
-                    Text("Create your first habit and start building consistency.", textAlign: TextAlign.center, style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
-                    const SizedBox(height: 24),
-                    ElevatedButton(
-                      onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AddEditHabitScreen())),
-                      child: const Text('Create Habit'),
+                    Expanded(
+                      child: Container(
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(22),
+                          border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                        ),
+                        child: TextField(
+                          onChanged: (value) {
+                            setState(() {
+                              _searchQuery = value;
+                            });
+                          },
+                          decoration: InputDecoration(
+                            hintText: 'Search habits...',
+                            hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+                            prefixIcon: Icon(Icons.search, color: theme.colorScheme.primary),
+                            border: InputBorder.none,
+                            contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    PopupMenuButton<HabitSortOption>(
+                      initialValue: _sortOption,
+                      icon: Icon(Icons.sort, color: theme.colorScheme.primary),
+                      tooltip: 'Sort habits',
+                      onSelected: (HabitSortOption option) {
+                        setState(() {
+                          _sortOption = option;
+                        });
+                      },
+                      itemBuilder: (BuildContext context) {
+                        return HabitSortOption.values.map((HabitSortOption option) {
+                          return PopupMenuItem<HabitSortOption>(
+                            value: option,
+                            child: Text(option.label, style: TextStyle(
+                              color: _sortOption == option ? theme.colorScheme.primary : theme.colorScheme.onSurface,
+                              fontWeight: _sortOption == option ? FontWeight.bold : FontWeight.normal,
+                            )),
+                          );
+                        }).toList();
+                      },
                     ),
                   ],
                 ),
               ),
-            )
-          : Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 800),
-                child: ListView.builder(
-                  padding: const EdgeInsets.all(16.0),
-                  itemCount: habits.length,
-                  itemBuilder: (context, index) {
-                    final habit = habits[index];
-                    return _buildHabitCard(context, ref, habit, logs, theme);
-                  },
-                ),
+              Expanded(
+                child: habits.isEmpty
+                    ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(32.0),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.style, size: 48, color: theme.colorScheme.primaryContainer),
+                              const SizedBox(height: 16),
+                              Text("No habits yet", style: theme.textTheme.headlineSmall),
+                              const SizedBox(height: 8),
+                              Text("Create your first habit and start building consistency.", textAlign: TextAlign.center, style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
+                              const SizedBox(height: 24),
+                              ElevatedButton(
+                                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AddEditHabitScreen())),
+                                child: const Text('Create Habit'),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                        itemCount: habits.length,
+                        itemBuilder: (context, index) {
+                          final habit = habits[index];
+                          return _buildHabitCard(context, habit, logs, theme);
+                        },
+                      ),
               ),
-            ),
+            ],
+          ),
+        ),
+      ),
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
           Navigator.push(
@@ -91,28 +189,34 @@ class HabitsScreen extends ConsumerWidget {
 
 
 
-  Widget _buildHabitCard(BuildContext context, WidgetRef ref, Habit habit, List<HabitLog> logs, ThemeData theme) {
-    final percent30 = ConsistencyCalculator.calculatePercentage(habit, logs, 30);
-
-    IconData habitIcon = Icons.star_border; // default
-    final lowerTitle = habit.title.toLowerCase();
-    if (lowerTitle.contains('run')) {
-      habitIcon = Icons.directions_run;
-    } else if (lowerTitle.contains('water') || lowerTitle.contains('hydration')) {
-      habitIcon = Icons.water_drop;
-    } else if (lowerTitle.contains('read') || lowerTitle.contains('book')) {
-      habitIcon = Icons.menu_book;
-    } else if (lowerTitle.contains('meditat')) {
-      habitIcon = Icons.self_improvement;
+  int _getHourForHabit(Habit habit) {
+    if (habit.timeOfDay == null || habit.timeOfDay == 'Anytime') return -1;
+    final timeLower = habit.timeOfDay!.toLowerCase();
+    if (timeLower.contains('morning')) return 8;
+    if (timeLower.contains('afternoon') || timeLower.contains('noon')) return 12;
+    if (timeLower.contains('evening')) return 16;
+    if (timeLower.contains('night')) return 20;
+    
+    final parts = habit.timeOfDay!.split(':');
+    if (parts.length >= 2) {
+      return int.tryParse(parts[0]) ?? -1;
     }
+    return -1;
+  }
+
+  Widget _buildHabitCard(BuildContext context, Habit habit, List<HabitLog> logs, ThemeData theme) {
+    final percent30 = ConsistencyCalculator.calculatePercentage(habit, logs, 30);
+    final habitIcon = HabitUIHelper.getIconForHabit(habit.title);
+    final habitColor = HabitUIHelper.getColorForHabit(habit.title);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      elevation: 0,
-      color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+      elevation: 3,
+      shadowColor: theme.colorScheme.shadow.withValues(alpha: 0.15),
+      color: theme.brightness == Brightness.light ? Colors.white : theme.colorScheme.surfaceContainerHigh,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.2)),
+        side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
@@ -131,10 +235,10 @@ class HabitsScreen extends ConsumerWidget {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.primaryContainer.withValues(alpha: 0.5),
+                  color: habitColor,
                   shape: BoxShape.circle,
                 ),
-                child: Icon(habitIcon, color: theme.colorScheme.primary),
+                child: Icon(habitIcon, color: Colors.black87),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -143,7 +247,7 @@ class HabitsScreen extends ConsumerWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      habit.title,
+                      habit.title.capitalizeAllWords(),
                       style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
                     ),
                     const SizedBox(height: 2),

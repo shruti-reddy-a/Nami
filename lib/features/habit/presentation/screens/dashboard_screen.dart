@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:nami/core/utils/string_extensions.dart';
+import 'package:nami/features/habit/presentation/utils/habit_ui_helper.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:nami/core/constants/app_strings.dart';
 import 'package:nami/features/habit/data/habit.dart';
@@ -26,7 +28,9 @@ class DashboardScreen extends ConsumerWidget {
       "You do not rise to the level of your goals. You fall to the level of your systems.",
       "Motivation is what gets you started. Habit is what keeps you going."
     ];
-    return quotes[Random().nextInt(quotes.length)];
+    final now = DateTime.now();
+    final seed = now.year * 10000 + now.month * 100 + now.day;
+    return quotes[Random(seed).nextInt(quotes.length)];
   }
 
   int _getHourForHabit(Habit habit) {
@@ -112,34 +116,43 @@ class DashboardScreen extends ConsumerWidget {
                     style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
                     textAlign: TextAlign.center,
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    "Build habits with consistency, not perfection.",
-                    style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.primary, fontWeight: FontWeight.w600),
-                    textAlign: TextAlign.center,
-                  ),
                   const SizedBox(height: 16),
                   
                   // Motivational Quote Box
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: theme.colorScheme.primaryContainer),
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.format_quote, color: theme.colorScheme.primary, size: 32),
-                        const SizedBox(height: 8),
-                        Text(
+                  Stack(
+                    children: [
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: theme.colorScheme.primaryContainer.withValues(alpha: 0.5)),
+                        ),
+                        child: Text(
                           _getRandomQuote(),
                           textAlign: TextAlign.center,
-                          style: theme.textTheme.bodyMedium?.copyWith(fontStyle: FontStyle.italic, color: theme.colorScheme.onSurfaceVariant),
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            fontStyle: FontStyle.italic,
+                            color: theme.colorScheme.onSurfaceVariant,
+                            height: 1.5,
+                          ),
                         ),
-                      ],
-                    ),
+                      ),
+                      Positioned(
+                        top: 8,
+                        left: 12,
+                        child: Icon(Icons.format_quote, color: theme.colorScheme.primary.withValues(alpha: 0.2), size: 40),
+                      ),
+                      Positioned(
+                        bottom: 8,
+                        right: 12,
+                        child: RotatedBox(
+                          quarterTurns: 2,
+                          child: Icon(Icons.format_quote, color: theme.colorScheme.primary.withValues(alpha: 0.2), size: 40),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -210,63 +223,83 @@ class DashboardScreen extends ConsumerWidget {
     final now = DateTime.now();
     final logList = logs.where((l) => l.habitId == habit.id && !l.isDeleted && l.timestamp.year == now.year && l.timestamp.month == now.month && l.timestamp.day == now.day).toList();
     final isLogged = logList.isNotEmpty;
+    final isMissed = HabitUIHelper.isMissed(habit, isLogged);
     
-    IconData habitIcon = Icons.star_border; // default
-    final lowerTitle = habit.title.toLowerCase();
-    if (lowerTitle.contains('run')) {
-      habitIcon = Icons.directions_run;
-    } else if (lowerTitle.contains('water') || lowerTitle.contains('hydrat')) {
-      habitIcon = Icons.water_drop;
-    } else if (lowerTitle.contains('read') || lowerTitle.contains('book')) {
-      habitIcon = Icons.menu_book;
-    } else if (lowerTitle.contains('meditat')) {
-      habitIcon = Icons.self_improvement;
-    }
+    final habitIcon = HabitUIHelper.getIconForHabit(habit.title);
+    final habitColor = HabitUIHelper.getColorForHabit(habit.title);
+    final frequencyText = HabitUIHelper.getFrequencyText(habit);
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Material(
-        color: isLogged ? theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3) : theme.colorScheme.surface,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: BorderSide(color: isLogged ? Colors.transparent : theme.colorScheme.outlineVariant.withValues(alpha: 0.3)),
-        ),
-        child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-        leading: Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: isLogged ? theme.colorScheme.surfaceContainerHighest : theme.colorScheme.primaryContainer.withValues(alpha: 0.5),
-            shape: BoxShape.circle,
+    return Opacity(
+      opacity: isMissed ? 0.5 : 1.0,
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Material(
+          elevation: isLogged ? 0 : 3,
+          shadowColor: theme.colorScheme.shadow.withValues(alpha: 0.15),
+          color: isLogged 
+              ? theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3) 
+              : (theme.brightness == Brightness.light ? Colors.white : theme.colorScheme.surfaceContainerHigh),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(color: isLogged ? Colors.transparent : theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
           ),
-          child: Icon(habitIcon, color: isLogged ? theme.colorScheme.onSurfaceVariant : theme.colorScheme.primary, size: 18),
-        ),
-        title: Text(
-          habit.title,
-          style: TextStyle(
-            fontWeight: FontWeight.w600,
-            decoration: isLogged ? TextDecoration.lineThrough : null,
-            color: isLogged ? theme.colorScheme.onSurfaceVariant : theme.colorScheme.onSurface,
-          ),
-        ),
-        trailing: GestureDetector(
-          onTap: () {
-            HapticFeedback.mediumImpact();
-            if (!isLogged) {
-              ref.read(habitLogProvider.notifier).logHabit(habit.id);
-            } else {
-              ref.read(habitLogProvider.notifier).removeLog(logList.first.id);
-            }
-          },
-          child: Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Icon(
-              isLogged ? Icons.check_circle : Icons.circle_outlined,
-              color: isLogged ? const Color(0xFF00696F) : theme.colorScheme.onSurfaceVariant,
-              size: 26,
+          child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            leading: Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: isLogged ? theme.colorScheme.surfaceContainerHighest : habitColor,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(habitIcon, color: isLogged ? theme.colorScheme.onSurfaceVariant : Colors.black87, size: 20),
             ),
-          ),
+            title: Text(
+              habit.title.capitalizeAllWords(),
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                decoration: isLogged ? TextDecoration.lineThrough : null,
+                color: isLogged ? theme.colorScheme.onSurfaceVariant : theme.colorScheme.onSurface,
+              ),
+            ),
+            subtitle: Text(
+              isMissed ? 'Missed' : frequencyText,
+              style: TextStyle(
+                fontSize: 12,
+                color: isMissed ? Colors.redAccent.withValues(alpha: 0.8) : theme.colorScheme.onSurfaceVariant,
+                fontStyle: isMissed ? FontStyle.italic : FontStyle.normal,
+              ),
+            ),
+            trailing: isMissed 
+                ? Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Text('—', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 18, fontWeight: FontWeight.bold)),
+                  )
+                : InkWell(
+                    borderRadius: BorderRadius.circular(20),
+                    onTap: () {
+                      HapticFeedback.mediumImpact();
+                      if (!isLogged) {
+                        ref.read(habitLogProvider.notifier).logHabit(habit.id);
+                      } else {
+                        ref.read(habitLogProvider.notifier).removeLog(logList.first.id);
+                      }
+                    },
+                    child: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: isLogged ? const Color(0xFF00696F) : theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
+                        shape: BoxShape.circle,
+                        border: isLogged ? null : Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.2), width: 1.5),
+                      ),
+                      child: Icon(
+                        isLogged ? Icons.check : Icons.add,
+                        color: isLogged ? Colors.white : theme.colorScheme.primary,
+                        size: 20,
+                      ),
+                    ),
+                  ),
           ),
         ),
       ),

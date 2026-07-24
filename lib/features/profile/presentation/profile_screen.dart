@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:nami/features/auth/presentation/login_screen.dart';
+import 'package:nami/core/presentation/widgets/common_app_bar_actions.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -231,27 +232,28 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        title: const Text('Profile', style: TextStyle(fontWeight: FontWeight.w800)),
-        centerTitle: true,
+        title: Text('NAMI', style: TextStyle(fontWeight: FontWeight.w800, color: theme.colorScheme.primary, letterSpacing: 1.2)),
         backgroundColor: Colors.transparent,
         elevation: 0,
+        actions: const [CommonAppBarActions()],
       ),
       body: profileAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (err, stack) => Center(child: Text('Error: $err')),
         data: (profile) {
           final photoUrl = profile?.photoUrl;
-          final emoji = profile?.emoji ?? '😊';
 
           return Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 800),
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(24.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    const SizedBox(height: 32),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      const SizedBox(height: 32),
                     GestureDetector(
                       onTap: _showAvatarPicker,
                       child: Stack(
@@ -269,7 +271,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                 ? const Center(child: CircularProgressIndicator())
                                 : photoUrl != null
                                     ? ClipOval(child: Image.network(photoUrl, fit: BoxFit.cover))
-                                    : Center(child: Text(emoji, style: const TextStyle(fontSize: 56))),
+                                    : Center(child: Icon(Icons.person, color: theme.colorScheme.primary, size: 64)),
                           ),
                           Container(
                             padding: const EdgeInsets.all(8),
@@ -307,11 +309,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     const SizedBox(height: 48),
                     
                     // Actions
-                    Container(
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(24),
-                      ),
+                    Material(
+                      color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(24),
+                      clipBehavior: Clip.antiAlias,
                       child: Column(
                         children: [
                           ListTile(
@@ -333,6 +334,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   ],
                 ),
               ),
+            ),
             ),
           );
         },
