@@ -1,10 +1,10 @@
+import 'package:nami/features/habit/presentation/screens/planner_screen.dart';
+import 'package:nami/features/habit/presentation/screens/dashboard_screen.dart';
+import 'package:nami/features/habit/presentation/screens/habits_screen.dart';
+import 'package:nami/features/habit/presentation/screens/progress_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'dashboard_screen.dart';
-import 'planner_screen.dart';
-import 'progress_screen.dart';
-import 'settings_screen.dart';
-import '../constants/app_strings.dart';
+import 'package:nami/core/constants/app_strings.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -18,9 +18,9 @@ class _MainScreenState extends State<MainScreen> {
 
   final List<Widget> _screens = [
     const DashboardScreen(),
+    const HabitsScreen(),
     const PlannerScreen(),
     const ProgressScreen(),
-    const SettingsScreen(),
   ];
 
   @override
@@ -49,6 +49,11 @@ class _MainScreenState extends State<MainScreen> {
             label: AppStrings.tabHome,
           ),
           NavigationDestination(
+            icon: Icon(Icons.list_alt_outlined),
+            selectedIcon: Icon(Icons.list_alt),
+            label: 'Habits',
+          ),
+          NavigationDestination(
             icon: Icon(Icons.calendar_month_outlined),
             selectedIcon: Icon(Icons.calendar_month),
             label: AppStrings.tabPlanner,
@@ -57,11 +62,6 @@ class _MainScreenState extends State<MainScreen> {
             icon: Icon(Icons.bar_chart_outlined),
             selectedIcon: Icon(Icons.bar_chart),
             label: AppStrings.tabProgress,
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.settings_outlined),
-            selectedIcon: Icon(Icons.settings),
-            label: AppStrings.tabSettings,
           ),
         ],
       ),

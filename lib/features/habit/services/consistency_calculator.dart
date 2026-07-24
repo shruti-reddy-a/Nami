@@ -1,6 +1,6 @@
-import '../models/habit.dart';
-import '../models/habit_log.dart';
-import '../models/habit_recurrence.dart';
+import 'package:nami/features/habit/data/habit.dart';
+import 'package:nami/features/habit/data/habit_log.dart';
+import 'package:nami/features/habit/data/habit_recurrence.dart';
 
 class ConsistencyCalculator {
   static double getTargetForPeriod(Habit habit, int effectiveDays) {

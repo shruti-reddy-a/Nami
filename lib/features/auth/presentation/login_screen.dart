@@ -1,8 +1,9 @@
+import 'package:nami/core/presentation/main_screen.dart';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-import 'screens/main_screen.dart';
-import 'constants/app_strings.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:nami/core/constants/app_strings.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -12,6 +13,123 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
+  final _nameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+  bool _isLoading = false;
+  bool _isLoginMode = true;
+  bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loginOrRegister() async {
+    final name = _nameController.text.trim();
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+    final confirmPassword = _confirmPasswordController.text.trim();
+
+    if (email.isEmpty || password.isEmpty || (!_isLoginMode && (name.isEmpty || confirmPassword.isEmpty))) {
+      _showError('Please fill in all fields');
+      return;
+    }
+
+    if (!_isLoginMode && password != confirmPassword) {
+      _showError('Passwords do not match');
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    
+    try {
+      if (_isLoginMode) {
+        await FirebaseAuth.instance.signInWithEmailAndPassword(
+          email: email,
+          password: password,
+        );
+      } else {
+        final userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+          email: email,
+          password: password,
+        );
+        await userCredential.user?.updateDisplayName(name);
+      }
+      _navigateHome();
+    } on FirebaseAuthException catch (e) {
+      _showError(e.message ?? 'Authentication failed');
+    } catch (e) {
+      _showError(e.toString());
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _resetPassword() async {
+    final email = _emailController.text.trim();
+    if (email.isEmpty) {
+      _showError('Please enter your email address first to reset your password');
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Password reset email sent. Please check your inbox.')),
+        );
+      }
+    } on FirebaseAuthException catch (e) {
+      _showError(e.message ?? 'Failed to send password reset email');
+    } catch (e) {
+      _showError(e.toString());
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _signInWithGoogle() async {
+    setState(() => _isLoading = true);
+    try {
+      final GoogleAuthProvider googleProvider = GoogleAuthProvider();
+      await FirebaseAuth.instance.signInWithPopup(googleProvider);
+      _navigateHome();
+    } on FirebaseAuthException catch (e) {
+      _showError(e.message ?? 'Google Sign-In failed');
+    } catch (e) {
+      _showError(e.toString());
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  void _showError(String message) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+    }
+  }
+
+  void _navigateHome() {
+    if (mounted) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const MainScreen()),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -147,51 +265,85 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              if (!_isLoginMode) ...[
+                _buildTextField(
+                  label: 'Full Name',
+                  hint: 'Wade Wilson',
+                  controller: _nameController,
+                  theme: theme,
+                  icon: Icons.person_outline,
+                ),
+                const SizedBox(height: 24),
+              ],
               _buildTextField(
                 label: AppStrings.emailLabel,
-                hint: AppStrings.emailHint,
+                hint: 'ripple@nami.com',
+                controller: _emailController,
                 theme: theme,
                 keyboardType: TextInputType.emailAddress,
+                icon: Icons.email_outlined,
               ),
               const SizedBox(height: 24),
-              _buildPasswordField(theme),
+              _buildPasswordField(
+                theme: theme,
+                controller: _passwordController,
+                label: AppStrings.passwordLabel,
+                hint: '••••••••',
+                isObscure: _obscurePassword,
+                onToggleObscure: () => setState(() => _obscurePassword = !_obscurePassword),
+                showForgotPassword: _isLoginMode,
+                onForgotPassword: _resetPassword,
+              ),
+              if (!_isLoginMode) ...[
+                const SizedBox(height: 24),
+                _buildPasswordField(
+                  theme: theme,
+                  controller: _confirmPasswordController,
+                  label: 'Confirm Password',
+                  hint: '••••••••',
+                  isObscure: _obscureConfirmPassword,
+                  onToggleObscure: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
+                  showForgotPassword: false,
+                ),
+              ],
               const SizedBox(height: 32),
               ElevatedButton(
-                onPressed: () {
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(builder: (_) => const MainScreen()),
-                  );
-                },
+                onPressed: _isLoading ? null : _loginOrRegister,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: theme.colorScheme.primary,
-                  foregroundColor: theme.colorScheme.onPrimary,
+                  backgroundColor: const Color(0xFF006D77), // Teal button
+                  foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 20),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(999),
                   ),
                   elevation: 2,
                 ),
-                child: const Text(
-                  AppStrings.getStarted,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
+                child: _isLoading
+                    ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                    : Text(
+                        _isLoginMode ? AppStrings.login : 'Create Account',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
               ),
               const SizedBox(height: 16),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    AppStrings.alreadyHaveAccount,
+                    _isLoginMode ? 'New to Nami?' : 'Already have an account?',
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
                   TextButton(
-                    onPressed: () {},
+                    onPressed: () {
+                      setState(() {
+                        _isLoginMode = !_isLoginMode;
+                      });
+                    },
                     style: TextButton.styleFrom(
                       foregroundColor: theme.colorScheme.primary,
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -199,9 +351,9 @@ class _LoginScreenState extends State<LoginScreen> {
                         borderRadius: BorderRadius.circular(999),
                       ),
                     ),
-                    child: const Text(
-                      AppStrings.login,
-                      style: TextStyle(fontWeight: FontWeight.bold),
+                    child: Text(
+                      _isLoginMode ? 'Create account' : 'Log in',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                   ),
                 ],
@@ -232,6 +384,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       theme: theme,
                       iconWidget: const FaIcon(FontAwesomeIcons.google, size: 20, color: Color(0xFF4285F4)),
                       label: AppStrings.googleLogin,
+                      onPressed: _signInWithGoogle,
                     ),
                   ),
                   const SizedBox(width: 16),
@@ -240,6 +393,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       theme: theme,
                       iconWidget: const FaIcon(FontAwesomeIcons.apple, size: 20, color: Colors.black),
                       label: AppStrings.appleLogin,
+                      onPressed: () {},
                     ),
                   ),
                 ],
@@ -255,6 +409,8 @@ class _LoginScreenState extends State<LoginScreen> {
     required String label,
     required String hint,
     required ThemeData theme,
+    required TextEditingController controller,
+    required IconData icon,
     TextInputType? keyboardType,
   }) {
     return Column(
@@ -271,25 +427,37 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
         TextFormField(
+          controller: controller,
           keyboardType: keyboardType,
           style: theme.textTheme.bodyLarge,
           decoration: InputDecoration(
             hintText: hint,
             hintStyle: TextStyle(color: theme.colorScheme.outlineVariant),
-            filled: true,
-            fillColor: const Color(0xFFF2F4F5),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide.none,
+            prefixIcon: Icon(icon, color: theme.colorScheme.onSurfaceVariant),
+            filled: false,
+            enabledBorder: UnderlineInputBorder(
+              borderSide: BorderSide(color: theme.colorScheme.outlineVariant),
             ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+            focusedBorder: UnderlineInputBorder(
+              borderSide: BorderSide(color: const Color(0xFF006D77), width: 2),
+            ),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 0, vertical: 16),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildPasswordField(ThemeData theme) {
+  Widget _buildPasswordField({
+    required ThemeData theme, 
+    required TextEditingController controller,
+    required String label,
+    required String hint,
+    required bool isObscure,
+    required VoidCallback onToggleObscure,
+    required bool showForgotPassword,
+    VoidCallback? onForgotPassword,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -299,38 +467,49 @@ class _LoginScreenState extends State<LoginScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                AppStrings.passwordLabel,
+                label,
                 style: theme.textTheme.labelLarge?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              GestureDetector(
-                onTap: () {},
-                child: Text(
-                  AppStrings.forgotPassword,
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    color: theme.colorScheme.primary,
-                    fontWeight: FontWeight.w600,
+              if (showForgotPassword)
+                GestureDetector(
+                  onTap: onForgotPassword,
+                  child: Text(
+                    AppStrings.forgotPassword,
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: const Color(0xFF006D77),
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
-              ),
             ],
           ),
         ),
         TextFormField(
-          obscureText: true,
+          controller: controller,
+          obscureText: isObscure,
           style: theme.textTheme.bodyLarge,
           decoration: InputDecoration(
-            hintText: AppStrings.passwordHint,
+            hintText: hint,
             hintStyle: TextStyle(color: theme.colorScheme.outlineVariant),
-            filled: true,
-            fillColor: const Color(0xFFF2F4F5),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide.none,
+            prefixIcon: Icon(Icons.lock_outline, color: theme.colorScheme.onSurfaceVariant),
+            suffixIcon: IconButton(
+              icon: Icon(
+                isObscure ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                color: theme.colorScheme.outlineVariant,
+              ),
+              onPressed: onToggleObscure,
             ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+            filled: false,
+            enabledBorder: UnderlineInputBorder(
+              borderSide: BorderSide(color: theme.colorScheme.outlineVariant),
+            ),
+            focusedBorder: UnderlineInputBorder(
+              borderSide: BorderSide(color: const Color(0xFF006D77), width: 2),
+            ),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 0, vertical: 16),
           ),
         ),
       ],
@@ -341,9 +520,10 @@ class _LoginScreenState extends State<LoginScreen> {
     required ThemeData theme,
     required Widget iconWidget,
     required String label,
+    required VoidCallback onPressed,
   }) {
     return OutlinedButton.icon(
-      onPressed: () {},
+      onPressed: _isLoading ? null : onPressed,
       style: OutlinedButton.styleFrom(
         backgroundColor: Colors.white.withValues(alpha: 0.5),
         side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.2)),

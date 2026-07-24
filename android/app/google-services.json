@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1001936688730",
+    "project_id": "nami-23edb",
+    "storage_bucket": "nami-23edb.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1001936688730:android:098b22c4c9183bb13bea63",
+        "android_client_info": {
+          "package_name": "com.example.nami"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBxaRe9y9qH0qdOT-pagnaRkskThRCz-Zs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

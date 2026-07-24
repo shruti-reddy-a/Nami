@@ -1,5 +1,5 @@
 import 'package:uuid/uuid.dart';
-import 'habit_recurrence.dart';
+import 'package:nami/features/habit/data/habit_recurrence.dart';
 
 class Habit {
   final String id;

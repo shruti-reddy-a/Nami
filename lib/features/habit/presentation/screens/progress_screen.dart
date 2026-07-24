@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../constants/app_strings.dart';
+import 'package:nami/core/constants/app_strings.dart';
 
 class ProgressScreen extends StatelessWidget {
   const ProgressScreen({super.key});

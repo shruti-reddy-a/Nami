@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../models/habit.dart';
-import '../providers/habit_provider.dart';
-import '../services/consistency_calculator.dart';
-import '../constants/app_strings.dart';
-import 'add_edit_habit_screen.dart';
+import 'package:nami/features/habit/data/habit.dart';
+import 'package:nami/features/habit/providers/habit_provider.dart';
+import 'package:nami/features/habit/services/consistency_calculator.dart';
+import 'package:nami/core/constants/app_strings.dart';
+import 'package:nami/features/habit/presentation/screens/add_edit_habit_screen.dart';
 
 class HabitDetailScreen extends ConsumerWidget {
   final Habit habit;
