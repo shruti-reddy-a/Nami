@@ -113,6 +113,50 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     await service.updateUserProfile(newProfile);
   }
 
+  void _showEditNameDialog(String currentName) {
+    final controller = TextEditingController(text: currentName);
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Edit Name'),
+          content: TextField(
+            controller: controller,
+            decoration: const InputDecoration(labelText: 'Name'),
+            textCapitalization: TextCapitalization.words,
+            autofocus: true,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () async {
+                final newName = controller.text.trim();
+                if (newName.isNotEmpty && newName != currentName) {
+                  final user = FirebaseAuth.instance.currentUser!;
+                  final service = ref.read(firebaseServiceProvider);
+                  final currentProfile = ref.read(userProfileProvider).value;
+                  
+                  final newProfile = currentProfile?.copyWith(displayName: newName) ?? UserProfile(
+                    uid: user.uid,
+                    email: user.email ?? '',
+                    displayName: newName,
+                  );
+                  
+                  await service.updateUserProfile(newProfile);
+                }
+                if (context.mounted) Navigator.pop(context);
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   void _showAvatarPicker() {
     showModalBottomSheet(
       context: context,
@@ -199,79 +243,96 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           final photoUrl = profile?.photoUrl;
           final emoji = profile?.emoji ?? '😊';
 
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                const SizedBox(height: 32),
-                GestureDetector(
-                  onTap: _showAvatarPicker,
-                  child: Stack(
-                    alignment: Alignment.bottomRight,
-                    children: [
-                      Container(
-                        width: 120,
-                        height: 120,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: theme.colorScheme.primaryContainer.withValues(alpha: 0.5),
-                          border: Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.3), width: 3),
-                        ),
-                        child: _isUploading
-                            ? const Center(child: CircularProgressIndicator())
-                            : photoUrl != null
-                                ? ClipOval(child: Image.network(photoUrl, fit: BoxFit.cover))
-                                : Center(child: Text(emoji, style: const TextStyle(fontSize: 56))),
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 800),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    const SizedBox(height: 32),
+                    GestureDetector(
+                      onTap: _showAvatarPicker,
+                      child: Stack(
+                        alignment: Alignment.bottomRight,
+                        children: [
+                          Container(
+                            width: 120,
+                            height: 120,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: theme.colorScheme.primaryContainer.withValues(alpha: 0.5),
+                              border: Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.3), width: 3),
+                            ),
+                            child: _isUploading
+                                ? const Center(child: CircularProgressIndicator())
+                                : photoUrl != null
+                                    ? ClipOval(child: Image.network(photoUrl, fit: BoxFit.cover))
+                                    : Center(child: Text(emoji, style: const TextStyle(fontSize: 56))),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.primary,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(Icons.edit, color: theme.colorScheme.onPrimary, size: 20),
+                          ),
+                        ],
                       ),
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.primary,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(Icons.edit, color: theme.colorScheme.onPrimary, size: 20),
+                    ),
+                    const SizedBox(height: 24),
+                    GestureDetector(
+                      onTap: () {
+                        _showEditNameDialog(profile?.displayName ?? 'Nami User');
+                      },
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            profile?.displayName ?? 'Nami User',
+                            style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(width: 8),
+                          Icon(Icons.edit, color: theme.colorScheme.primary, size: 20),
+                        ],
                       ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 24),
-                Text(
-                  profile?.displayName ?? 'Nami User',
-                  style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  user?.email ?? '',
-                  style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                ),
-                const SizedBox(height: 48),
-                
-                // Actions
-                Container(
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(24),
-                  ),
-                  child: Column(
-                    children: [
-                      ListTile(
-                        leading: const Icon(Icons.logout),
-                        title: const Text('Log Out'),
-                        trailing: const Icon(Icons.chevron_right),
-                        onTap: _logout,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      user?.email ?? '',
+                      style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                    ),
+                    const SizedBox(height: 48),
+                    
+                    // Actions
+                    Container(
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(24),
                       ),
-                      Divider(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.2), height: 1),
-                      ListTile(
-                        leading: const Icon(Icons.delete_forever, color: Colors.red),
-                        title: const Text('Delete Account', style: TextStyle(color: Colors.red)),
-                        trailing: const Icon(Icons.chevron_right, color: Colors.red),
-                        onTap: _deleteAccount,
+                      child: Column(
+                        children: [
+                          ListTile(
+                            leading: const Icon(Icons.logout),
+                            title: const Text('Log Out'),
+                            trailing: const Icon(Icons.chevron_right),
+                            onTap: _logout,
+                          ),
+                          Divider(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.2), height: 1),
+                          ListTile(
+                            leading: const Icon(Icons.delete_forever, color: Colors.red),
+                            title: const Text('Delete Account', style: TextStyle(color: Colors.red)),
+                            trailing: const Icon(Icons.chevron_right, color: Colors.red),
+                            onTap: _deleteAccount,
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           );
         },

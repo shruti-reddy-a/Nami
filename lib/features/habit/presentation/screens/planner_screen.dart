@@ -247,7 +247,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
         Navigator.push(context, MaterialPageRoute(builder: (_) => HabitDetailScreen(habit: habit)));
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
         color: Colors.transparent, // Ensures the entire area is tappable
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,

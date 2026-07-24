@@ -41,14 +41,38 @@ class HabitsScreen extends ConsumerWidget {
         actions: const [CommonAppBarActions()],
       ),
       body: habits.isEmpty
-          ? _buildEmptyState(context, theme)
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: habits.length,
-              itemBuilder: (context, index) {
-                final habit = habits[index];
-                return _buildHabitCard(context, ref, habit, logs, theme);
-              },
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.style, size: 48, color: theme.colorScheme.primaryContainer),
+                    const SizedBox(height: 16),
+                    Text("No habits yet", style: theme.textTheme.headlineSmall),
+                    const SizedBox(height: 8),
+                    Text("Create your first habit and start building consistency.", textAlign: TextAlign.center, style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
+                    const SizedBox(height: 24),
+                    ElevatedButton(
+                      onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AddEditHabitScreen())),
+                      child: const Text('Create Habit'),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          : Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 800),
+                child: ListView.builder(
+                  padding: const EdgeInsets.all(16.0),
+                  itemCount: habits.length,
+                  itemBuilder: (context, index) {
+                    final habit = habits[index];
+                    return _buildHabitCard(context, ref, habit, logs, theme);
+                  },
+                ),
+              ),
             ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
@@ -65,45 +89,7 @@ class HabitsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildEmptyState(BuildContext context, ThemeData theme) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.waves, size: 80, color: theme.colorScheme.primaryContainer),
-            const SizedBox(height: 24),
-            Text(
-              AppStrings.welcomeTitle,
-              style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              AppStrings.welcomeSubtitle,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-            ),
-            const SizedBox(height: 32),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const AddEditHabitScreen()),
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: theme.colorScheme.primary,
-                foregroundColor: theme.colorScheme.onPrimary,
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-              ),
-              child: const Text(AppStrings.createFirstHabit),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+
 
   Widget _buildHabitCard(BuildContext context, WidgetRef ref, Habit habit, List<HabitLog> logs, ThemeData theme) {
     final percent30 = ConsistencyCalculator.calculatePercentage(habit, logs, 30);
@@ -154,6 +140,7 @@ class HabitsScreen extends ConsumerWidget {
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
                       habit.title,

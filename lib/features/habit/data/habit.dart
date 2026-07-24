@@ -50,6 +50,52 @@ class Habit {
     );
   }
 
+  bool isScheduledOnDate(DateTime date) {
+    final start = DateTime(createdAt.year, createdAt.month, createdAt.day);
+    final target = DateTime(date.year, date.month, date.day);
+    
+    if (target.isBefore(start)) return false;
+    
+    if (recurrence.endDate != null) {
+      final end = DateTime(recurrence.endDate!.year, recurrence.endDate!.month, recurrence.endDate!.day);
+      if (target.isAfter(end)) return false;
+    }
+
+    if (!_checkOccurs(start, target)) return false;
+
+    if (recurrence.endOccurrences != null) {
+      int count = 0;
+      DateTime current = start;
+      while (current.isBefore(target) || current.isAtSameMomentAs(target)) {
+        if (_checkOccurs(start, current)) {
+          count++;
+        }
+        if (count > recurrence.endOccurrences!) return false;
+        current = current.add(const Duration(days: 1));
+      }
+    }
+    
+    return true;
+  }
+
+  bool _checkOccurs(DateTime start, DateTime d) {
+    final freq = recurrence.frequency;
+    final interval = recurrence.interval;
+    
+    if (freq == RecurrenceFrequency.daily) {
+      final daysDiff = d.difference(start).inDays;
+      return daysDiff % interval == 0;
+    } else if (freq == RecurrenceFrequency.weekly) {
+      final daysDiff = d.difference(start).inDays;
+      final weeksDiff = daysDiff ~/ 7;
+      return weeksDiff % interval == 0 && recurrence.daysOfWeek.contains(d.weekday);
+    } else if (freq == RecurrenceFrequency.monthly) {
+      final monthsDiff = (d.year - start.year) * 12 + d.month - start.month;
+      return monthsDiff % interval == 0 && d.day == (recurrence.dayOfMonth ?? start.day);
+    }
+    return false;
+  }
+
   Habit copyWith({
     String? title,
     String? timeOfDay,
