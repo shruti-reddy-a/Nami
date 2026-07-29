@@ -22,6 +22,10 @@ enum ViewType { month, week, day }
 class _PlannerScreenState extends ConsumerState<PlannerScreen> {
   ViewType _currentView = ViewType.day;
   final EventController<Object?> _eventController = EventController<Object?>();
+  DateTime _selectedDate = DateTime.now();
+  final GlobalKey<DayViewState> _dayViewStateKey = GlobalKey<DayViewState>();
+  final GlobalKey<WeekViewState> _weekViewStateKey = GlobalKey<WeekViewState>();
+  final GlobalKey<MonthViewState> _monthViewStateKey = GlobalKey<MonthViewState>();
 
   @override
   void initState() {
@@ -140,6 +144,36 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
     return events;
   }
 
+  double _calculateInitialScrollOffset(DateTime date, ViewType type) {
+    const double hourHeight = 42.0; 
+    
+    DateTime? earliest;
+    
+    final daysToCheck = <DateTime>[];
+    if (type == ViewType.week) {
+      final startOfWeek = date.subtract(Duration(days: date.weekday - 1));
+      for (int i = 0; i < 7; i++) {
+        daysToCheck.add(startOfWeek.add(Duration(days: i)));
+      }
+    } else {
+      daysToCheck.add(date);
+    }
+    
+    for (final day in daysToCheck) {
+      final eventsOnDate = _eventController.getEventsOnDay(day);
+      for (final e in eventsOnDate) {
+        if (e.startTime != null) {
+          if (earliest == null || e.startTime!.isBefore(earliest)) {
+            earliest = e.startTime;
+          }
+        }
+      }
+    }
+    
+    if (earliest == null) return 0.0;
+    return earliest.hour * hourHeight;
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -163,25 +197,11 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
         ),
         actions: const [CommonAppBarActions()],
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(80),
+          preferredSize: const Size.fromHeight(56),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    DateFormat('EEEE, MMMM d').format(DateTime.now()),
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  Icon(Icons.edit_outlined, size: 14, color: theme.colorScheme.onSurfaceVariant),
-                ],
-              ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
               SegmentedButton<ViewType>(
                 showSelectedIcon: false,
                 segments: const [
@@ -262,14 +282,14 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
         ),
         clipBehavior: Clip.hardEdge,
         child: OverflowBox(
-          alignment: Alignment.topLeft,
           minHeight: 0,
           maxHeight: double.infinity,
+          alignment: Alignment.topLeft,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+              crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
             // Left Indicator (only for pending)
             if (!isLogged)
               Container(
@@ -321,9 +341,11 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
             
             // Details
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
+              child: SingleChildScrollView(
+                physics: const NeverScrollableScrollPhysics(),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
                     habit.title.capitalizeAllWords(),
@@ -353,10 +375,11 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
                 ],
               ),
             ),
+          ),
           ],
         ),
-      ),
-      ),
+        ),
+        ),
       ),
     );
       },
@@ -367,8 +390,56 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
     switch (_currentView) {
       case ViewType.month:
         return MonthView<Object?>(
+          key: _monthViewStateKey,
           controller: controller,
+          monthViewStyle: MonthViewStyle(initialMonth: _selectedDate),
           monthViewBuilders: MonthViewBuilders<Object?>(
+            headerBuilder: (date) {
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8.0),
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.chevron_left),
+                      onPressed: () => _monthViewStateKey.currentState?.previousPage(),
+                    ),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () async {
+                          final selectedDate = await showDatePicker(
+                            context: context,
+                            initialDate: date,
+                            firstDate: DateTime(2000),
+                            lastDate: DateTime(2100),
+                            initialDatePickerMode: DatePickerMode.year,
+                            helpText: 'Select a Month (Pick any day)',
+                          );
+                          if (selectedDate != null) {
+                            setState(() => _selectedDate = selectedDate);
+                            _monthViewStateKey.currentState?.jumpToMonth(selectedDate);
+                          }
+                        },
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(DateFormat('MMMM yyyy').format(date), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+                            const SizedBox(width: 8),
+                            Icon(Icons.edit, size: 18, color: theme.colorScheme.primary),
+                          ],
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.chevron_right),
+                      onPressed: () => _monthViewStateKey.currentState?.nextPage(),
+                    ),
+                  ],
+                ),
+              );
+            },
+            onPageChange: (date, pageIndex) {
+              setState(() => _selectedDate = date);
+            },
             onCellTap: (events, date) {
               if (events.isNotEmpty && events.first.event is Habit) {
                 Navigator.push(context, MaterialPageRoute(builder: (_) => HabitDetailScreen(habit: events.first.event as Habit)));
@@ -383,9 +454,14 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
                   color: isToday ? theme.colorScheme.primaryContainer.withValues(alpha: 0.3) : Colors.transparent,
                   border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5), width: 0.5),
                 ),
-                child: Column(
-                  children: [
-                    const SizedBox(height: 4),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    if (constraints.maxHeight < 24) {
+                      return const SizedBox.shrink();
+                    }
+                    return Column(
+                      children: [
+                        const SizedBox(height: 2),
                     Text(
                       '${date.day}',
                       style: TextStyle(
@@ -427,6 +503,8 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
                       ),
                     ),
                   ],
+                );
+                  },
                 ),
               );
             },
@@ -434,15 +512,134 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
         );
       case ViewType.week:
         return WeekView<Object?>(
+          key: _weekViewStateKey,
           controller: controller,
+          initialDay: _selectedDate,
+          scrollOffset: _calculateInitialScrollOffset(_selectedDate, ViewType.week),
+          weekPageHeaderBuilder: (startDate, endDate) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8.0),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.chevron_left),
+                    onPressed: () => _weekViewStateKey.currentState?.previousPage(),
+                  ),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () async {
+                        final selectedDate = await showDatePicker(
+                          context: context,
+                          initialDate: startDate, 
+                          firstDate: DateTime(2000),
+                          lastDate: DateTime(2100),
+                          helpText: 'Select a Week (Pick a Monday)',
+                          selectableDayPredicate: (day) => day.weekday == DateTime.monday,
+                        );
+                        if (selectedDate != null) {
+                          setState(() => _selectedDate = selectedDate);
+                          _weekViewStateKey.currentState?.jumpToWeek(selectedDate);
+                          final newOffset = _calculateInitialScrollOffset(selectedDate, ViewType.week);
+                          if (_weekViewStateKey.currentState?.scrollController.hasClients == true) {
+                            _weekViewStateKey.currentState?.scrollController.animateTo(newOffset, duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
+                          }
+                        }
+                      },
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text('${DateFormat('MMMM d, yyyy').format(startDate)} - ${DateFormat('MMMM d, yyyy').format(endDate)}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                          const SizedBox(width: 8),
+                          Icon(Icons.edit, size: 16, color: theme.colorScheme.primary),
+                        ],
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.chevron_right),
+                    onPressed: () => _weekViewStateKey.currentState?.nextPage(),
+                  ),
+                ],
+              ),
+            );
+          },
+          onPageChange: (date, pageIndex) {
+            setState(() => _selectedDate = date);
+            final newOffset = _calculateInitialScrollOffset(date, ViewType.week);
+            if (_weekViewStateKey.currentState?.scrollController.hasClients == true) {
+              _weekViewStateKey.currentState?.scrollController.animateTo(
+                newOffset,
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeInOut,
+              );
+            }
+          },
           eventTileBuilder: (date, events, boundary, startDuration, endDuration) {
             return _buildHabitCard(date, events, boundary, startDuration, endDuration, theme);
           },
         );
       case ViewType.day:
         return DayView<Object?>(
+          key: _dayViewStateKey,
           controller: controller,
-          dayTitleBuilder: (date) => const SizedBox.shrink(),
+          initialDay: _selectedDate,
+          scrollOffset: _calculateInitialScrollOffset(_selectedDate, ViewType.day),
+          dayTitleBuilder: (date) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8.0),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.chevron_left),
+                    onPressed: () => _dayViewStateKey.currentState?.previousPage(),
+                  ),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () async {
+                        final selectedDate = await showDatePicker(
+                          context: context,
+                          initialDate: date,
+                          firstDate: DateTime(2000),
+                          lastDate: DateTime(2100),
+                        );
+                        if (selectedDate != null) {
+                          setState(() => _selectedDate = selectedDate);
+                          _dayViewStateKey.currentState?.jumpToDate(selectedDate);
+                          final newOffset = _calculateInitialScrollOffset(selectedDate, ViewType.day);
+                          if (_dayViewStateKey.currentState?.scrollController.hasClients == true) {
+                            _dayViewStateKey.currentState?.scrollController.animateTo(newOffset, duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
+                          }
+                        }
+                      },
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(DateFormat('MMMM d, yyyy').format(date), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+                          const SizedBox(width: 8),
+                          Icon(Icons.edit, size: 18, color: theme.colorScheme.primary),
+                        ],
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.chevron_right),
+                    onPressed: () => _dayViewStateKey.currentState?.nextPage(),
+                  ),
+                ],
+              ),
+            );
+          },
+          onPageChange: (date, pageIndex) {
+            setState(() => _selectedDate = date);
+            final newOffset = _calculateInitialScrollOffset(date, ViewType.day);
+            if (_dayViewStateKey.currentState?.scrollController.hasClients == true) {
+              _dayViewStateKey.currentState?.scrollController.animateTo(
+                newOffset,
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeInOut,
+              );
+            }
+          },
           eventTileBuilder: (date, events, boundary, startDuration, endDuration) {
             return _buildHabitCard(date, events, boundary, startDuration, endDuration, theme);
           },

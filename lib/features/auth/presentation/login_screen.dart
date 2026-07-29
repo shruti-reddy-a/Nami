@@ -382,7 +382,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   Expanded(
                     child: _buildSocialButton(
                       theme: theme,
-                      iconWidget: const FaIcon(FontAwesomeIcons.google, size: 20, color: Color(0xFF4285F4)),
+                      iconWidget: Image.asset('assets/images/google_logo.png', width: 20, height: 20),
                       label: AppStrings.googleLogin,
                       onPressed: _signInWithGoogle,
                     ),
